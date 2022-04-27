@@ -1,0 +1,73 @@
+---
+"$schema": http://json-schema.org/draft-07/schema#
+"$id": https://github.com/gocityengineering/elastic-metrics/schema/schema.json
+"$defs":
+  query:
+    type: object
+    properties:
+      label:
+        type: string
+      luceneQuery:
+        type: string
+      defaultField:
+        type: string
+      team:
+        type: string
+      recipients:
+        type: array
+        items:
+          "$ref": "#/$defs/email"
+      alertThreshold:
+        type: number
+      addLabels:
+        type: boolean
+      compact:
+        type: boolean
+      ignore:
+        type: boolean  
+    required:
+      - label
+      - luceneQuery
+      - defaultField
+  email:
+    type: string
+    pattern: "^[a-z0-9._%+\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,4}$"
+title: "elastic-metrics schema"
+type: object
+properties:
+  elasticProtocol:
+    type: string
+    enum:
+      - http
+      - https
+  elasticService:
+    type: string
+  elasticPort:
+    type: number
+  kibanaUrl:
+    type: string
+  prometheusUrl:
+    type: string
+  emailService:
+    type: string
+  emailServicePort:
+    type: number
+  queryIntervalMinutes:
+    type: number
+  queryFromMinutes:
+    type: number
+  maxForwardedResultsPerQuery:
+    type: number
+  logMatches:
+    type: boolean
+  verbose:
+    type: boolean
+  leadingDatestampRegex:
+    type: string
+  queries:
+    type: array
+    items:
+      "$ref": "#/$defs/query"
+required:
+  - elasticService
+  - queries

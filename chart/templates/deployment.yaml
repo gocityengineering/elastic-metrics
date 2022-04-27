@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "elastic-metrics.fullname" . }}
+  labels:
+    {{- include "elastic-metrics.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "elastic-metrics.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "elastic-metrics.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "elastic-metrics.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "elastic-metrics.fullname" . }}
+          env:
+            {{- if eq .Values.env "dev-euw2" }}
+            - name: platformSlackApiUrl
+              valueFrom:
+                secretKeyRef:
+                  name: slack
+                  key: devPlatformSlackApiUrl
+            - name: ecomSlackApiUrl
+              valueFrom:
+                secretKeyRef:
+                  name: slack
+                  key: devEcomSlackApiUrl
+            - name: passManagementSlackApiUrl
+              valueFrom:
+                secretKeyRef:
+                  name: slack
+                  key: devPassManagementSlackApiUrl
+            {{- else if eq .Values.env "prod-use2" }}
+            - name: platformSlackApiUrl
+              valueFrom:
+                secretKeyRef:
+                  name: slack
+                  key: platformSlackApiUrl
+            - name: ecomSlackApiUrl
+              valueFrom:
+                secretKeyRef:
+                  name: slack
+                  key: ecomSlackApiUrl
+            - name: passManagementSlackApiUrl
+              valueFrom:
+                secretKeyRef:
+                  name: slack
+                  key: passManagementSlackApiUrl
+            - name: sitesSlackApiUrl
+              valueFrom:
+                secretKeyRef:
+                  name: slack
+                  key: sitesSlackApiUrl
+            {{- end }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/elastic-metrics/config.yaml
+              subPath: config.yaml
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.imagePrefix }}/{{ .Values.imageName}}:{{ .Values.appVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "elastic-metrics.fullname" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

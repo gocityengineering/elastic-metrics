@@ -1,0 +1,7 @@
+elasticProtocol: http
+elasticService: elasticsearch-master.elastic-system.svc.cluster.local
+elasticPort: 9200
+queryIntervalMinutes: 5
+queryFromMinutes: 7
+maxForwardedResultsPerQuery: 10
+queries: []

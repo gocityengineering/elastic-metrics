@@ -1,0 +1,31 @@
+{{- if eq .Values.env "dev" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "elastic-metrics.fullname" . }}
+  labels:
+    {{- include "elastic-metrics.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    elasticProtocol: http
+    elasticService: elasticsearch-master.elastic-system.svc.cluster.local
+    elasticPort: 9200
+    kibanaUrl: https://kibana.acme.com
+    prometheusUrl: https://prometheus.acme.com
+    # email support
+    emailService: email-service.default.svc.cluster.local
+    emailServicePort: 8080
+    # lower is better for timely alerts
+    # for hourly rate of increase, use PromQL
+    queryIntervalMinutes: 5
+    # this value should be > 1 * queryInterval and  < 2 * queryInterval
+    # a given log entry should appear in no more than two consecutive queries
+    # as the deduplication hashmap resets after guarding against repeat entries
+    queryFromMinutes: 7
+    # don't overwhelm your Slack channel
+    # this is the cap on results forwarded for a single query
+    maxForwardedResultsPerQuery: 2
+    # don't log matches to prevent feedback loops
+    logMatches: false
+    queries: []
+{{- end }}

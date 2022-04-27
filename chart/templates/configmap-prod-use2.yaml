@@ -1,0 +1,222 @@
+{{- if eq .Values.env "prod-use2" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "elastic-metrics.fullname" . }}
+  labels:
+    {{- include "elastic-metrics.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    elasticProtocol: http
+    elasticService: elasticsearch-master.elastic-system.svc.cluster.local
+    elasticPort: 9200
+    kibanaUrl: https://kibana.prod-use2.common.lpge.co
+    prometheusUrl: https://prometheus.prod-use2.common.lpge.co
+    # email support
+    emailService: email-service.devops-infra.svc.cluster.local
+    emailServicePort: 8080
+    # lower is better for timely alerts
+    # interested in hourly rate of increase? Prometheus is your friend
+    queryIntervalMinutes: 6
+    # this value should be > 1 * queryInterval and < 2 * queryInterval
+    # a given log entry should appear in no more than two consecutive queries
+    # as the deduplication hashmap resets after guarding against repeat entries
+    queryFromMinutes: 8
+    # don't overwhelm your Slack channel
+    # this is the cap on results forwarded for a single query
+    maxForwardedResultsPerQuery: 2
+    # logging matches can lead to feedback loops
+    logMatches: false
+    # in Lucene queries, be sure to escape the special characters: + - && || ! ( ) { } [ ] ^ " ~ * ? : \
+    # use lower case strings as Lucene normalises the input buffer to lower case
+    # see https://lucene.apache.org/core/2_9_4/queryparsersyntax.html
+    queries:
+      # passManagement
+      - label: "Gone for a dip - storefront"
+        luceneQuery: 'kubernetes.container.name:(+"storefront") AND message:(+"org.apache.velocity.exception.ResourceNotFoundException" +"partner/choosePartner.vm")'
+        defaultField: "*"
+        team: "passManagement"
+      - label: "Galaxy Activation ERROR"
+        luceneQuery: 'kubernetes.pod.name:(+/galaxy-connect-activation-service.*/ -/.*mongo-init.*/) AND message:(+"error" -"info" -"warn")'
+        defaultField: "*"
+        team: "passManagement"
+      - label: "Galaxy Usage ERROR"
+        luceneQuery: 'kubernetes.pod.name:/galaxy-connect-usage-service.*/ AND message:(+"error" -"info" -"warn")'
+        defaultField: "*"
+        team: "passManagement"
+      - label: "PASSPORT Net Rate Failures"
+        luceneQuery: 'kubernetes.container.name:/sdiapi/ AND +"passport" +"error" +"no passport rate found"'
+        defaultField: "*"
+        team: "passManagement"
+        ignore: true
+      - label: "SDIAPI Passport ERROR"
+        luceneQuery: 'kubernetes.container.name:/sdiapi/ AND message:(+"passport" +"error" -"no passport rate found" -"Net Price not found" -"trade-partner")'
+        defaultField: "*"
+        team: "passManagement"
+      - label: "Error checking LPOS health"
+        luceneQuery: 'kubernetes.container.name:(+"sdi-hermes") AND message:(+"Error checking LPOS health")'
+        defaultField: "*"
+        team: "passManagement"
+        ignore: true
+      - label: "GO-Omniscan Internal Scan Kafka Publishing ERROR"
+        luceneQuery: 'kubernetes.container.name:(+"go-omniscan") AND message:(+"Failed to publish scan to kafka for message")'
+        defaultField: "*"
+        team: "passManagement"
+      - label: "Integration Pass Usage - Failed to Make a Scan in Omniscan"
+        luceneQuery: 'kubernetes.namespace:(+"prod-passport") AND kubernetes.pod.name:/integration-pass-usage-service.*/ AND message:(+"Omniscan Client has failed to process scan for")'
+        defaultField: "*"
+        team: "passManagement"
+      # ecom
+      - label: "Booking portal - user setup error"
+        luceneQuery: 'kubernetes.pod.name:/booking-portal-service.*/ AND message:(+"error" AND ("is not a sales venue" OR "Unable to find vendor for userId" OR "Trade user not found for"))'
+        defaultField: "*"
+        recipients:
+           - "paul.forsyth@gocity.com"
+           - "lynne.dawson@gocity.com"
+           - "harrison.stevens@gocity.com"
+           - "courtney.spagnuolo@gocity.com"
+      - label: "Booking portal - price list not found"
+        luceneQuery: 'kubernetes.pod.name:/booking-portal-service.*/ AND message:(+"error" AND ("No available PriceList was found for" OR "Price List has not been found"))'
+        defaultField: "*"
+        recipients:
+           - "paul.forsyth@gocity.com"
+           - "lynne.dawson@gocity.com"
+           - "harrison.stevens@gocity.com"
+           - "courtney.spagnuolo@gocity.com"
+      - label: "SDIAPI - no product has been found for the venue"
+        luceneQuery: 'kubernetes.container.name:(+"sdiapi") AND message:(+"No Product has been found for the venue" -"GenericSalesVendor")'
+        defaultField: "*"
+        recipients:
+           - "paul.forsyth@gocity.com"
+           - "lynne.dawson@gocity.com"
+           - "harrison.stevens@gocity.com"
+           - "courtney.spagnuolo@gocity.com"
+      - label: "Groupon - price list not found"
+        luceneQuery: 'kubernetes.container.name:(+"commerceapi") AND message:(+"Price List has not been found Venue\: Groupon")'
+        defaultField: "*"
+        addLabels: true
+        recipients:
+           - "paul.forsyth@gocity.com"
+           - "lynne.dawson@gocity.com"
+           - "harrison.stevens@gocity.com"
+           - "courtney.spagnuolo@gocity.com"
+      - label: "Expedia - price list not found"
+        luceneQuery: 'kubernetes.container.name:(+"commerceapi") AND message:(+"Price List has not been found Venue\: Expedia")'
+        defaultField: "*"
+        addLabels: true
+        recipients:
+           - "paul.forsyth@gocity.com"
+           - "lynne.dawson@gocity.com"
+           - "harrison.stevens@gocity.com"
+           - "courtney.spagnuolo@gocity.com"
+      - label: "Booking Portal general errors"
+        luceneQuery: 'kubernetes.namespace:(+"prod-ecom") AND kubernetes.pod.name:/booking-portal-service.*/ AND message:(+"error" AND NOT ("OrderNotFoundException" OR "ServiceException" OR "FeignException" OR "ItemRequest Size" OR "You are not authorized to cancel order" OR "Not all orders got created. All orders will be cancelled" OR "cancelled because it has validated scans" OR "Existing External OrderNumber" OR "is not a sales venue" OR "unable to find vendor for userid" OR "trade user not found for" OR "no available pricelist was found for" OR "price list has not been found" OR "jaeger" OR /zipkin.*/))'
+        defaultField: "*"
+        alertThreshold: 3
+        addLabels: false
+        team: "ecom"
+      - label: "Delivery Service - Missing Data Error"
+        luceneQuery: 'kubernetes.pod.name:/delivery-service.*/ AND message:(+"error" +("mappingnotfoundexception" OR "carriernotfoundexception" OR "productnotfoundexception"))'
+        defaultField: "*"
+        addLabels: true
+        team: "ecom"
+      - label: "Replay Error - Order Errors"
+        luceneQuery: 'kubernetes.pod.name:/kafka-replay-service.*/ AND message:("Received topic error :: order_notification-service_error" OR "Received topic error :: email-order_email-service_error" OR "Received topic error :: order_omnia-integration-service_error")'
+        defaultField: "*"
+        addLabels: false
+        team: "ecom"
+      - label: "Delivery Service ERROR"
+        luceneQuery: 'kubernetes.pod.name:(+/delivery-service.*/ -/.*mongo-init.*/) AND message:(+"error" -"jaeger")'
+        defaultField: "*"
+        addLabels: true
+        team: "ecom"
+      - label: "Product Aggregator - WARNING ONLY - No prices found for an enabled product"
+        luceneQuery: 'kubernetes.pod.name:/product-aggregator-service.*/ AND message:("Product is enabled but does not have active prices" OR "Error getting prices for product")'
+        defaultField: "*"
+        addLabels: true
+        team: "ecom"
+      - label: "CommerceApi - No web prices found"
+        luceneQuery: 'kubernetes.container.name:(+"commerceapi") AND message:(+"error getting prices \:\:")'
+        defaultField: "*"
+        team: "ecom"
+      - label: "EP - Broken Pod - PassManagement"
+        luceneQuery: 'kubernetes.namespace:(+"prod\-ep6") AND kubernetes.container.name:("sdiapi" OR "storefront") AND message:(+"org.apache.openjpa.persistence.argumentexception" +"attempt to add null/empty fetch group name to fetch configuration")'
+        defaultField: "*"
+        addLabels: true
+        team: "passManagement"
+      - label: "EP - Broken Pod - ECOM"
+        luceneQuery: 'kubernetes.namespace:(+"prod\-ep6") AND kubernetes.container.name:("commerceapi" OR "commerceportal") AND message:(+"org.apache.openjpa.persistence.argumentexception" +"attempt to add null/empty fetch group name to fetch configuration")'
+        defaultField: "*"
+        addLabels: true
+        team: "ecom"
+      - label: "CommerceAPI - ClientAbortException"
+        luceneQuery: 'kubernetes.namespace:(+"prod\-ep6") AND kubernetes.container.name:(+"commerceapi") AND message:(+"clientabortexception")'
+        defaultField: "*"
+        alertThreshold: 50
+        team: "ecom"
+      - label: "Basket - API Failures"
+        luceneQuery: 'kubernetes.container.name:(+"commerceapi") AND message:("Failed to add to basket for" OR  "Failed to get basket for" OR "Failed to create basket for" OR "Failed to remove from basket for")'
+        defaultField: "*"
+        alertThreshold: 10
+        team: "ecom"
+      # sites
+      - label: "PROD Redis - Connection Timeout"
+        luceneQuery: 'kubernetes.namespace:(+"prod\-ep6\-fe") AND message:("connection timed out" AND "\[tcp\://drupal\-redis-master\:6379\]")'
+        defaultField: "*"
+        team: "sites"
+      - label: "PROD Drupal Errors"
+        luceneQuery: 'kubernetes.namespace:(+"prod-ep6-fe") AND message:(+"\[error\]" -"input/output")'
+        defaultField: "*"
+        team: "sites"
+        alertThreshold: 500
+        compact: true
+      - label: "Drupal IO Error"
+        luceneQuery: 'kubernetes.namespace:(+"prod-ep6-fe") AND message(+"input/output error")'
+        defaultField: "*"
+        team: "sites"
+      # platform
+      - label: "Log4Shell"
+        luceneQuery: 'kubernetes.container.name:(-"elastic-metrics") AND message:(+"jndi\:ldap")'
+        defaultField: "*"
+        addLabels: true
+        # omit team so Log4Shell can be tracked in Prometheus but doesn't alert Slack
+      - label: "Mitwald Replication"
+        luceneQuery: 'kubernetes.container.name : "kubernetes-replicator" AND message : "level=error")'
+        defaultField: "*"
+        team: "platform"
+      - label: "Failed event (pod startup)"
+        luceneQuery: 'kubernetes.pod.name:/event-exporter.*/ AND message:(+"reason=Failed ")'
+        defaultField: "*"
+        team: "platform"
+      - label: "Fitness function failed (prod)"
+        luceneQuery: 'kubernetes.container.name:/fitness-functions/ AND message:(+"failed" -"failures")'
+        defaultField: "*"
+        team: "platform"
+        recipients: ["gerald.schmidt@gocity.com"]
+      - label: "FailedScheduling (prod)"
+        luceneQuery: 'kubernetes.container.name:"event\-exporter" AND message:(+"FailedScheduling" +"namespace=prod")'
+        defaultField: "*"
+        team: "platform"
+        ignore: true
+      - label: "SystemOOM (prod)"
+        luceneQuery: 'kubernetes.container.name:"event\-exporter" AND message(+"SystemOOM" +"namespace=prod" -"keycloak\-export")'
+        defaultField: "*"
+        team: "platform"
+      - label: "SystemOOM (platform)"
+        luceneQuery: 'kubernetes.container.name:event-exporter AND message:(+"SystemOOM" -"namespace=prod")'
+        defaultField: "*"
+        team: "platform"
+        ignore: true
+      - label: "Back-off (prod)"
+        luceneQuery: 'kubernetes.container.name:"event\-exporter" AND message:(+"Back\-off restarting failed container" +"namespace=prod" -"keycloak\-export")'
+        defaultField: "*"
+        team: "platform"
+      - label: "Calico node not ready"
+        luceneQuery: 'kubernetes.container.name:"event\-exporter" AND message(+"calico\-node" +"readiness probe failed" -"bird")'
+        defaultField: "*"
+        team: "platform"
+      - label: "Failed"
+        luceneQuery: 'kubernetes.container.name:"event\-exporter" AND message(+"reason=Failed ")'
+        defaultField: "*"
+        team: "platform"
+ {{- end }}

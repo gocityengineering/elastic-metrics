@@ -1,0 +1,29 @@
+{{- if .Values.autoscaling.enabled }} 
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "elastic-metrics.fullname" . }}
+  labels:
+    {{- include "elastic-metrics.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "elastic-metrics.fullname" . }}
+  minReplicas: 1
+  maxReplicas: 1
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 100
+{{- end }}
