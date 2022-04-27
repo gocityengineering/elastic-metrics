@@ -40,7 +40,7 @@ queries:
   - label: "EventFailedScheduling"
     luceneQuery: 'kubernetes.container.name:/ev.*exporter/ AND message:(+"FailedScheduling" -"namespace=kube\-system")'
     defaultField: "*"
-    team: "platform" # one of platform, ecom, passManagement (note the upper-case 'M')
+    team: "acmePlatform" # this name is used to identify the Slack secret
     ignore: false # optional: defaults to false
     compact: false # optional: defaults to false; don't send log lines to Slack
     addLabels: false # optional: add region, namespace and pod name to log lines
